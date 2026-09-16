@@ -10,7 +10,7 @@ import { registerTaskGuard } from './guards/taskGuard';
 import { createLedgerService } from './services/ledgerService';
 import { createShorebirdService } from './services/shorebirdService';
 import { createXcodeService, nodeXcodeFileSystem } from './services/xcodeService';
-import { createStatusBar, type StatusBar } from './ui/statusBar';
+import { createStatusBar, textFor, type StatusBar } from './ui/statusBar';
 import { createExec } from './util/exec';
 import { createLogger, type Logger } from './util/logger';
 
@@ -38,6 +38,7 @@ async function refreshStatusBar(
     return undefined;
   });
   statusBar.render(outcome, appLabel({ app }));
+  logger.info(`status bar: ${outcome === undefined ? 'unavailable' : textFor(outcome)}`);
 }
 
 async function refreshWorkspace(
