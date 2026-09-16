@@ -31,6 +31,15 @@ describe('exec', () => {
     });
   });
 
+  it('returns spawn-error instead of rejecting when the command is empty', async () => {
+    const exec = createExec();
+    const result = await exec({ command: '', args: [], timeoutMs: 1000 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason.kind).toBe('spawn-error');
+    }
+  });
+
   it('reports a missing binary as not-found', async () => {
     const exec = createExec();
     const result = await exec({

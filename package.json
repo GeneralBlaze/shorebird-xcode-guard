@@ -4,6 +4,11 @@
   "description": "Blocks shorebird patch ios when the active Xcode differs from the one that built the release.",
   "version": "1.0.0",
   "publisher": "nexcyph",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1E2A3A",
+    "theme": "dark"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -50,12 +55,12 @@
       },
       {
         "command": "shorebirdGuard.recordRelease",
-        "title": "Record current toolchain for release…",
+        "title": "Record current toolchain for release\u2026",
         "category": "Shorebird Guard"
       },
       {
         "command": "shorebirdGuard.switchXcode",
-        "title": "Switch active Xcode…",
+        "title": "Switch active Xcode\u2026",
         "category": "Shorebird Guard"
       },
       {

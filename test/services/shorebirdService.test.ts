@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createShorebirdService } from '../../src/services/shorebirdService';
+import { createCancellationSource } from '../../src/util/cancellation';
 import { capturedLogger, fakeExec, fixture, key, stdout } from './fakes';
 
 const CWD = '/tmp/app';
@@ -75,6 +76,25 @@ describe('shorebirdService.version', () => {
     );
     expect(fake.calls[0]?.cwd).toBe(CWD);
     expect(fake.calls[0]?.timeoutMs).toBe(42);
+  });
+});
+
+describe('shorebirdService cancellation', () => {
+  it('forwards the token to exec and reports cancelled when it fires', async () => {
+    const { logger } = capturedLogger();
+    const source = createCancellationSource();
+    const { exec, calls } = fakeExec((request) =>
+      request.token?.isCancellationRequested === true
+        ? { ok: false, reason: { kind: 'cancelled' } }
+        : undefined,
+    );
+    source.cancel();
+    const result = await createShorebirdService(exec, logger).version(
+      { ...options, token: source.token },
+      CWD,
+    );
+    expect(calls[0]?.token).toBe(source.token);
+    expect(result).toEqual({ ok: false, reason: { kind: 'cancelled' } });
   });
 });
 

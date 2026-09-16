@@ -60,6 +60,26 @@ function classify(
   return { kind: 'spawn-error', message: error.message };
 }
 
+function spawn(request: ExecRequest, resolve: (result: ExecResult) => void): void {
+  const state: { subscription: { readonly dispose: () => void } | undefined } = {
+    subscription: undefined,
+  };
+  const child = execFile(
+    request.command,
+    [...request.args],
+    { cwd: request.cwd, timeout: request.timeoutMs, maxBuffer: MAX_BUFFER_BYTES, encoding: 'utf8' },
+    (error, stdout, stderr) => {
+      state.subscription?.dispose();
+      if (error === null) {
+        resolve(ok({ stdout, stderr, exitCode: 0 }));
+        return;
+      }
+      resolve(fail(classify(error as NodeExecError, request, stdout, stderr)));
+    },
+  );
+  state.subscription = request.token?.onCancellationRequested(() => child.kill('SIGTERM'));
+}
+
 export function createExec(): Exec {
   return (request) =>
     new Promise<ExecResult>((resolve) => {
@@ -67,24 +87,15 @@ export function createExec(): Exec {
         resolve(fail({ kind: 'cancelled' }));
         return;
       }
-      const child = execFile(
-        request.command,
-        [...request.args],
-        {
-          cwd: request.cwd,
-          timeout: request.timeoutMs,
-          maxBuffer: MAX_BUFFER_BYTES,
-          encoding: 'utf8',
-        },
-        (error, stdout, stderr) => {
-          subscription?.dispose();
-          if (error === null) {
-            resolve(ok({ stdout, stderr, exitCode: 0 }));
-            return;
-          }
-          resolve(fail(classify(error as NodeExecError, request, stdout, stderr)));
-        },
-      );
-      const subscription = request.token?.onCancellationRequested(() => child.kill('SIGTERM'));
+      try {
+        spawn(request, resolve);
+      } catch (error) {
+        resolve(
+          fail({
+            kind: 'spawn-error',
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        );
+      }
     });
 }

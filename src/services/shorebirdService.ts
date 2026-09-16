@@ -1,3 +1,4 @@
+import type { CancellationToken } from '../util/cancellation';
 import type { Exec, ExecFailure } from '../util/exec';
 import type { Logger } from '../util/logger';
 import { fail, ok, type Result } from '../util/result';
@@ -6,6 +7,7 @@ import { cliVersionOf, isRecord, parseEnvelope, stringField, type CliEnvelope } 
 export interface ShorebirdOptions {
   readonly shorebirdPath: string;
   readonly timeoutMs: number;
+  readonly token?: CancellationToken;
 }
 
 export interface ShorebirdVersionInfo {
@@ -105,64 +107,72 @@ function parseReleases(data: unknown): readonly ShorebirdRelease[] | undefined {
     : undefined;
 }
 
+async function runJson(
+  exec: Exec,
+  log: Logger,
+  options: ShorebirdOptions,
+  cwd: string,
+  args: readonly string[],
+): Promise<Result<CliEnvelope, ShorebirdFailure>> {
+  const result = await exec({
+    command: options.shorebirdPath,
+    args,
+    cwd,
+    timeoutMs: options.timeoutMs,
+    ...(options.token === undefined ? {} : { token: options.token }),
+  });
+  if (!result.ok) {
+    return fail(mapExecFailure(result.reason, log));
+  }
+  const envelope = parseEnvelope(result.value.stdout);
+  if (envelope.ok) {
+    log.debug(`shorebird ${args.join(' ')} ok (cli ${cliVersionOf(envelope.value)})`);
+    return envelope;
+  }
+  if (envelope.reason.kind === 'status-failure') {
+    log.warn(`shorebird ${args.join(' ')} failed: ${envelope.reason.message}`);
+    return fail({ kind: 'cli-error', exitCode: 0, stderr: envelope.reason.message });
+  }
+  log.warn(
+    `shorebird ${args.join(' ')} returned ${envelope.reason.kind}; expected a --json envelope`,
+  );
+  return fail({ kind: 'unexpected-output', cliVersion: 'unknown' });
+}
+
+function unexpected<T>(
+  log: Logger,
+  envelope: CliEnvelope,
+  what: string,
+): Result<T, ShorebirdFailure> {
+  const cliVersion = cliVersionOf(envelope);
+  log.warn(`${what} shape not recognised (cli ${cliVersion}); treating as unknown`);
+  return fail({ kind: 'unexpected-output', cliVersion });
+}
+
 export function createShorebirdService(exec: Exec, logger: Logger): ShorebirdService {
   const log = logger.child('shorebird');
-
-  const run = async (
-    options: ShorebirdOptions,
-    cwd: string,
-    args: readonly string[],
-  ): Promise<Result<CliEnvelope, ShorebirdFailure>> => {
-    const result = await exec({
-      command: options.shorebirdPath,
-      args,
-      cwd,
-      timeoutMs: options.timeoutMs,
-    });
-    if (!result.ok) {
-      return fail(mapExecFailure(result.reason, log));
-    }
-    const envelope = parseEnvelope(result.value.stdout);
-    if (envelope.ok) {
-      log.debug(`shorebird ${args.join(' ')} ok (cli ${cliVersionOf(envelope.value)})`);
-      return envelope;
-    }
-    if (envelope.reason.kind === 'status-failure') {
-      log.warn(`shorebird ${args.join(' ')} failed: ${envelope.reason.message}`);
-      return fail({ kind: 'cli-error', exitCode: 0, stderr: envelope.reason.message });
-    }
-    log.warn(
-      `shorebird ${args.join(' ')} returned ${envelope.reason.kind}; expected a --json envelope`,
-    );
-    return fail({ kind: 'unexpected-output', cliVersion: 'unknown' });
-  };
-
-  const unexpected = <T>(envelope: CliEnvelope, what: string): Result<T, ShorebirdFailure> => {
-    const cliVersion = cliVersionOf(envelope);
-    log.warn(`${what} shape not recognised (cli ${cliVersion}); treating as unknown`);
-    return fail({ kind: 'unexpected-output', cliVersion });
-  };
-
   return {
     version: async (options, cwd) => {
-      const envelope = await run(options, cwd, ['--version', '--json']);
+      const envelope = await runJson(exec, log, options, cwd, ['--version', '--json']);
       if (!envelope.ok) {
         return envelope;
       }
       const info = parseVersionInfo(envelope.value.data);
-      return info === undefined ? unexpected(envelope.value, 'version') : ok(info);
+      return info === undefined ? unexpected(log, envelope.value, 'version') : ok(info);
     },
     listReleases: async (options, cwd, flavor) => {
       const args =
         flavor === undefined
           ? ['releases', 'list', '--json']
           : ['releases', 'list', '--json', '--flavor', flavor];
-      const envelope = await run(options, cwd, args);
+      const envelope = await runJson(exec, log, options, cwd, args);
       if (!envelope.ok) {
         return envelope;
       }
       const releases = parseReleases(envelope.value.data);
-      return releases === undefined ? unexpected(envelope.value, 'releases list') : ok(releases);
+      return releases === undefined
+        ? unexpected(log, envelope.value, 'releases list')
+        : ok(releases);
     },
   };
 }

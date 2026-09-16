@@ -51,62 +51,104 @@ async function refreshWorkspace(
   await refreshStatusBar(controller, statusBar, logger);
 }
 
-export function activate(context: vscode.ExtensionContext): void {
-  const channel = vscode.window.createOutputChannel('Shorebird Guard', { log: true });
-  const logger = createLogger(channel);
-  const exec = createExec();
-  const controller = createGuardController({
-    xcode: createXcodeService(exec, nodeXcodeFileSystem, logger),
-    shorebird: createShorebirdService(exec, logger),
-    ledger: createLedgerService(logger),
-    logger,
-  });
-  const statusBar = createStatusBar();
-  const commandContext: CommandContext = {
-    controller,
-    statusBar,
-    xcode: createXcodeService(exec, nodeXcodeFileSystem, logger),
-    logger,
-    showLogs: () => channel.show(),
-    refreshStatusBar: () => refreshStatusBar(controller, statusBar, logger),
+interface Refreshers {
+  readonly all: () => void;
+  readonly bar: () => void;
+}
+
+function createRefreshers(commandContext: CommandContext): Refreshers {
+  const { controller, statusBar, logger } = commandContext;
+  return {
+    all: () => {
+      refreshWorkspace(controller, statusBar, logger).catch((error: unknown) =>
+        logger.error(`workspace refresh failed: ${String(error)}`),
+      );
+    },
+    bar: () => {
+      commandContext
+        .refreshStatusBar()
+        .catch((error: unknown) => logger.error(`status refresh failed: ${String(error)}`));
+    },
   };
+}
+
+function registerListeners(
+  commandContext: CommandContext,
+  refresh: Refreshers,
+): readonly vscode.Disposable[] {
+  const { controller } = commandContext;
   const yamlWatcher = vscode.workspace.createFileSystemWatcher('**/shorebird.yaml');
   const ledgerWatcher = vscode.workspace.createFileSystemWatcher('**/.shorebird-guard/ledger.json');
-  const refreshAll = (): void => void refreshWorkspace(controller, statusBar, logger);
-  const refreshBar = (): void => void commandContext.refreshStatusBar();
   const editorState = { app: controller.activeApp()?.root };
-  context.subscriptions.push(
-    channel,
-    statusBar,
+  return [
     yamlWatcher,
     ledgerWatcher,
+    yamlWatcher.onDidCreate(refresh.all),
+    yamlWatcher.onDidDelete(refresh.all),
+    yamlWatcher.onDidChange(refresh.all),
+    ledgerWatcher.onDidChange(refresh.bar),
+    ledgerWatcher.onDidCreate(refresh.bar),
+    vscode.workspace.onDidChangeWorkspaceFolders(refresh.all),
+    vscode.workspace.onDidChangeConfiguration(
+      (e) => e.affectsConfiguration('shorebirdGuard') && refresh.bar(),
+    ),
+    vscode.window.onDidChangeWindowState((s) => s.focused && refresh.bar()),
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      const next = controller.activeApp()?.root;
+      if (next !== undefined && next !== editorState.app) {
+        editorState.app = next;
+        refresh.bar();
+      }
+    }),
+  ];
+}
+
+function registerCommands(
+  commandContext: CommandContext,
+  showLogs: () => void,
+): readonly vscode.Disposable[] {
+  return [
     registerCheckNow(commandContext),
     registerPatchIos(commandContext),
     registerRecordRelease(commandContext),
     registerSwitchXcode(commandContext),
     registerShowLedger(commandContext),
-    vscode.commands.registerCommand('shorebirdGuard.showLogs', () => channel.show()),
+    vscode.commands.registerCommand('shorebirdGuard.showLogs', showLogs),
     registerTaskGuard(commandContext),
-    yamlWatcher.onDidCreate(refreshAll),
-    yamlWatcher.onDidDelete(refreshAll),
-    yamlWatcher.onDidChange(refreshAll),
-    ledgerWatcher.onDidChange(refreshBar),
-    ledgerWatcher.onDidCreate(refreshBar),
-    vscode.workspace.onDidChangeWorkspaceFolders(refreshAll),
-    vscode.workspace.onDidChangeConfiguration(
-      (e) => e.affectsConfiguration('shorebirdGuard') && refreshBar(),
-    ),
-    vscode.window.onDidChangeWindowState((s) => s.focused && refreshBar()),
-    vscode.window.onDidChangeActiveTextEditor(() => {
-      const next = controller.activeApp()?.root;
-      if (next !== undefined && next !== editorState.app) {
-        editorState.app = next;
-        refreshBar();
-      }
-    }),
+  ];
+}
+
+export function activate(context: vscode.ExtensionContext): void {
+  const channel = vscode.window.createOutputChannel('Shorebird Guard', { log: true });
+  const logger = createLogger(channel);
+  const exec = createExec();
+  const xcode = createXcodeService(exec, nodeXcodeFileSystem, logger);
+  const controller = createGuardController({
+    xcode,
+    shorebird: createShorebirdService(exec, logger),
+    ledger: createLedgerService(logger),
+    logger,
+  });
+  const statusBar = createStatusBar();
+  const showLogs = (): void => channel.show();
+  const commandContext: CommandContext = {
+    controller,
+    statusBar,
+    xcode,
+    logger,
+    showLogs,
+    refreshStatusBar: () => refreshStatusBar(controller, statusBar, logger),
+  };
+  const refresh = createRefreshers(commandContext);
+  context.subscriptions.push(
+    channel,
+    statusBar,
+    { dispose: () => controller.dispose() },
+    ...registerCommands(commandContext, showLogs),
+    ...registerListeners(commandContext, refresh),
   );
   logger.info(`Shorebird Guard activating (${process.platform})`);
-  refreshAll();
+  refresh.all();
 }
 
 export function deactivate(): void {

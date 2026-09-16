@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-09-16
 
+### Fixed
+
+- `exec` returns a typed `spawn-error` instead of rejecting when the command cannot be spawned.
+- CLI and Xcode probes accept a cancellation token; a superseded check for the same app is cancelled.
+- Unreadable `shorebird.yaml` files and failed refreshes are logged instead of surfacing as unhandled rejections.
+- Extension icon and gallery banner added.
+
 ### Added
 
 - Toolchain fingerprint (Xcode version/build, Flutter revision, Shorebird version, macOS version).

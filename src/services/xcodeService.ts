@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseXcodebuildVersion } from '../domain/fingerprint';
+import type { CancellationToken } from '../util/cancellation';
 import type { Exec, ExecFailure } from '../util/exec';
 import type { Logger } from '../util/logger';
 import { fail, ok, type Result } from '../util/result';
@@ -28,6 +29,7 @@ export type XcodeFailure =
   | { readonly kind: 'no-xcode' }
   | { readonly kind: 'command-line-tools-only'; readonly developerDir: string }
   | { readonly kind: 'timeout'; readonly timeoutMs: number }
+  | { readonly kind: 'cancelled' }
   | { readonly kind: 'unexpected-output'; readonly stdout: string };
 
 export interface XcodeFileSystem {
@@ -36,7 +38,10 @@ export interface XcodeFileSystem {
 }
 
 export interface XcodeService {
-  readonly active: (timeoutMs: number) => Promise<Result<ActiveXcode, XcodeFailure>>;
+  readonly active: (
+    timeoutMs: number,
+    token?: CancellationToken,
+  ) => Promise<Result<ActiveXcode, XcodeFailure>>;
   readonly installed: () => Promise<readonly InstalledXcode[]>;
 }
 
@@ -67,6 +72,9 @@ function xcodebuildFailure(failure: ExecFailure, developerDir: string): XcodeFai
   if (failure.kind === 'timeout') {
     return { kind: 'timeout', timeoutMs: failure.timeoutMs };
   }
+  if (failure.kind === 'cancelled') {
+    return { kind: 'cancelled' };
+  }
   if (
     COMMAND_LINE_TOOLS.test(developerDir) ||
     (failure.kind === 'exit' && COMMAND_LINE_TOOLS.test(failure.stderr))
@@ -76,21 +84,17 @@ function xcodebuildFailure(failure: ExecFailure, developerDir: string): XcodeFai
   return { kind: 'no-xcode' };
 }
 
-export function createXcodeService(exec: Exec, fs: XcodeFileSystem, logger: Logger): XcodeService {
-  const log = logger.child('xcode');
+const withToken = (token: CancellationToken | undefined): { readonly token?: CancellationToken } =>
+  token === undefined ? {} : { token };
 
-  const firstLine = async (
-    command: string,
-    args: readonly string[],
-    timeoutMs: number,
-  ): Promise<string> => {
-    const result = await exec({ command, args, timeoutMs });
-    return result.ok ? result.value.stdout.trim() : '';
-  };
-
-  const readInstalled = async (name: string): Promise<InstalledXcode | undefined> => {
-    try {
-      const plist = await fs.readFile(join(APPLICATIONS, name, 'Contents', 'version.plist'));
+function readInstalled(
+  fs: XcodeFileSystem,
+  log: Logger,
+  name: string,
+): Promise<InstalledXcode | undefined> {
+  return fs
+    .readFile(join(APPLICATIONS, name, 'Contents', 'version.plist'))
+    .then((plist) => {
       const installed = toInstalled(name, plist);
       if (installed === undefined) {
         log.warn(
@@ -98,43 +102,64 @@ export function createXcodeService(exec: Exec, fs: XcodeFileSystem, logger: Logg
         );
       }
       return installed;
-    } catch (error) {
+    })
+    .catch((error: unknown) => {
       log.warn(`${name}: cannot read version.plist (${String(error)})`);
       return undefined;
-    }
-  };
+    });
+}
 
+async function readActive(
+  exec: Exec,
+  log: Logger,
+  timeoutMs: number,
+  token: CancellationToken | undefined,
+): Promise<Result<ActiveXcode, XcodeFailure>> {
+  const firstLine = async (command: string, args: readonly string[]): Promise<string> => {
+    const result = await exec({ command, args, timeoutMs, ...withToken(token) });
+    return result.ok ? result.value.stdout.trim() : '';
+  };
+  const developerDir = await firstLine('xcode-select', ['-p']);
+  const macosVersion = await firstLine('sw_vers', ['-productVersion']);
+  const build = await exec({
+    command: 'xcodebuild',
+    args: ['-version'],
+    timeoutMs,
+    ...withToken(token),
+  });
+  if (!build.ok) {
+    const failure = xcodebuildFailure(build.reason, developerDir);
+    log.warn(`xcodebuild -version failed: ${failure.kind}`);
+    return fail(failure);
+  }
+  const parsed = parseXcodebuildVersion(build.value.stdout);
+  if (parsed === undefined) {
+    log.warn(`xcodebuild -version output not recognised: ${build.value.stdout.trim()}`);
+    return fail({ kind: 'unexpected-output', stdout: build.value.stdout });
+  }
+  return ok({
+    xcodeVersion: parsed.version,
+    xcodeBuild: parsed.build,
+    xcodeDeveloperDir: developerDir,
+    macosVersion,
+  });
+}
+
+async function scanInstalled(fs: XcodeFileSystem, log: Logger): Promise<readonly InstalledXcode[]> {
+  const names = await fs.listApplications().catch((error: unknown) => {
+    log.warn(`cannot list ${APPLICATIONS}: ${String(error)}`);
+    return [] as readonly string[];
+  });
+  const candidates = await Promise.all(
+    names.filter((name) => XCODE_APP.test(name)).map((name) => readInstalled(fs, log, name)),
+  );
+  return candidates.filter((x): x is InstalledXcode => x !== undefined).sort(byPath);
+}
+
+export function createXcodeService(exec: Exec, fs: XcodeFileSystem, logger: Logger): XcodeService {
+  const log = logger.child('xcode');
   return {
-    active: async (timeoutMs) => {
-      const developerDir = await firstLine('xcode-select', ['-p'], timeoutMs);
-      const macosVersion = await firstLine('sw_vers', ['-productVersion'], timeoutMs);
-      const build = await exec({ command: 'xcodebuild', args: ['-version'], timeoutMs });
-      if (!build.ok) {
-        const failure = xcodebuildFailure(build.reason, developerDir);
-        log.warn(`xcodebuild -version failed: ${failure.kind}`);
-        return fail(failure);
-      }
-      const parsed = parseXcodebuildVersion(build.value.stdout);
-      if (parsed === undefined) {
-        log.warn(`xcodebuild -version output not recognised: ${build.value.stdout.trim()}`);
-        return fail({ kind: 'unexpected-output', stdout: build.value.stdout });
-      }
-      return ok({
-        xcodeVersion: parsed.version,
-        xcodeBuild: parsed.build,
-        xcodeDeveloperDir: developerDir,
-        macosVersion,
-      });
-    },
-    installed: async () => {
-      const names = await fs.listApplications().catch((error: unknown) => {
-        log.warn(`cannot list ${APPLICATIONS}: ${String(error)}`);
-        return [] as readonly string[];
-      });
-      const candidates = await Promise.all(
-        names.filter((name) => XCODE_APP.test(name)).map(readInstalled),
-      );
-      return candidates.filter((x): x is InstalledXcode => x !== undefined).sort(byPath);
-    },
+    active: (timeoutMs, token) => readActive(exec, log, timeoutMs, token),
+    installed: () => scanInstalled(fs, log),
   };
 }

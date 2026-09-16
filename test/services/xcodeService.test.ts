@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createXcodeService, type XcodeFileSystem } from '../../src/services/xcodeService';
+import { createCancellationSource } from '../../src/util/cancellation';
 import { capturedLogger, fakeExec, fixture, key, stdout } from './fakes';
 
 const plist = (version: string, build: string): string =>
@@ -120,6 +121,22 @@ describe('xcodeService.active', () => {
     if (result.ok) {
       expect(result.value.macosVersion).toBe('');
     }
+  });
+});
+
+describe('xcodeService cancellation', () => {
+  it('forwards the token to every exec call and reports cancelled', async () => {
+    const { logger } = capturedLogger();
+    const source = createCancellationSource();
+    const { exec, calls } = fakeExec((request) =>
+      request.token?.isCancellationRequested === true
+        ? { ok: false, reason: { kind: 'cancelled' } }
+        : undefined,
+    );
+    source.cancel();
+    const result = await createXcodeService(exec, fs({}), logger).active(timeout, source.token);
+    expect(calls.every((call) => call.token === source.token)).toBe(true);
+    expect(result).toEqual({ ok: false, reason: { kind: 'cancelled' } });
   });
 });
 
