@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:unit
+      - name: Integration tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:integration
+      - name: Integration tests (macOS)
+        if: runner.os == 'macOS'
+        run: npm run test:integration
+      - run: npx vsce package --no-dependencies
+      - name: Assert VSIX under 200 KB
+        shell: bash
+        run: |
+          size=$(stat -c%s *.vsix 2>/dev/null || stat -f%z *.vsix)
+          echo "VSIX size: $size bytes"
+          test "$size" -lt 204800
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.os }}
+          path: '*.vsix'
