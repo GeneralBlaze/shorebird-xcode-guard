@@ -51,7 +51,7 @@ function tooltipFor(outcome: GuardOutcome, appLabel: string): vscode.MarkdownStr
   return md;
 }
 
-function textFor(outcome: GuardOutcome): string {
+export function textFor(outcome: GuardOutcome): string {
   switch (outcome.state) {
     case 'checked': {
       const current = outcome.current.xcodeVersion;
@@ -76,7 +76,7 @@ function textFor(outcome: GuardOutcome): string {
   }
 }
 
-function backgroundFor(outcome: GuardOutcome): vscode.ThemeColor | undefined {
+export function backgroundFor(outcome: GuardOutcome): vscode.ThemeColor | undefined {
   if (outcome.state === 'ledger-error') {
     return new vscode.ThemeColor('statusBarItem.warningBackground');
   }

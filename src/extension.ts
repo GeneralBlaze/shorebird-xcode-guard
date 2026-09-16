@@ -50,7 +50,7 @@ async function refreshWorkspace(
   await refreshStatusBar(controller, statusBar, logger);
 }
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+export function activate(context: vscode.ExtensionContext): void {
   const channel = vscode.window.createOutputChannel('Shorebird Guard', { log: true });
   const logger = createLogger(channel);
   const exec = createExec();
@@ -105,7 +105,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
   logger.info(`Shorebird Guard activating (${process.platform})`);
-  await refreshWorkspace(controller, statusBar, logger);
+  refreshAll();
 }
 
 export function deactivate(): void {

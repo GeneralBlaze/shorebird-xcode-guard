@@ -29,8 +29,19 @@ const ledgerWith = (releases: Readonly<Record<string, LedgerEntry>>): Ledger => 
 
 const inputs = (overrides: Partial<GuardInputs>): GuardInputs => ({
   appId: 'app',
-  active: { ok: true, value: { xcodeVersion: '16.2', xcodeBuild: '16C5032a', xcodeDeveloperDir: '/x', macosVersion: '15.3' } },
-  version: { ok: true, value: { shorebirdVersion: '1.6.116', flutterVersion: '3.44.9', flutterRevision: 'rev1' } },
+  active: {
+    ok: true,
+    value: {
+      xcodeVersion: '16.2',
+      xcodeBuild: '16C5032a',
+      xcodeDeveloperDir: '/x',
+      macosVersion: '15.3',
+    },
+  },
+  version: {
+    ok: true,
+    value: { shorebirdVersion: '1.6.116', flutterVersion: '3.44.9', flutterRevision: 'rev1' },
+  },
   releases: { ok: true, value: [release('1.0.0+1'), release('1.0.0+2')] },
   ledger: { ok: true, value: ledgerWith({ '1.0.0+2': entry }) },
   policy: { blockOn: 'minor-drift', warnOn: 'patch-drift' },
@@ -62,7 +73,17 @@ describe('runGuardCheck', () => {
   it('blocks on minor drift with default policy', () => {
     const { logger } = capturedLogger();
     const result = runGuardCheck(
-      inputs({ active: { ok: true, value: { xcodeVersion: '16.1', xcodeBuild: '16B40', xcodeDeveloperDir: '/x', macosVersion: '15.3' } } }),
+      inputs({
+        active: {
+          ok: true,
+          value: {
+            xcodeVersion: '16.1',
+            xcodeBuild: '16B40',
+            xcodeDeveloperDir: '/x',
+            macosVersion: '15.3',
+          },
+        },
+      }),
       logger,
     );
     expect(result.state === 'checked' && result.action).toBe('block');
@@ -71,7 +92,10 @@ describe('runGuardCheck', () => {
 
   it('escalates to block when the flutter revision differs from the server release', () => {
     const { logger } = capturedLogger();
-    const result = runGuardCheck(inputs({ releases: { ok: true, value: [release('1.0.0+2', 'rev-other')] } }), logger);
+    const result = runGuardCheck(
+      inputs({ releases: { ok: true, value: [release('1.0.0+2', 'rev-other')] } }),
+      logger,
+    );
     expect(result.state === 'checked' && result.flutterRevisionMatches).toBe(false);
     expect(result.state === 'checked' && result.action).toBe('block');
   });
@@ -79,7 +103,10 @@ describe('runGuardCheck', () => {
   it('ignores flutter revision when the setting is off', () => {
     const { logger } = capturedLogger();
     const result = runGuardCheck(
-      inputs({ releases: { ok: true, value: [release('1.0.0+2', 'rev-other')] }, checkFlutterRevision: false }),
+      inputs({
+        releases: { ok: true, value: [release('1.0.0+2', 'rev-other')] },
+        checkFlutterRevision: false,
+      }),
       logger,
     );
     expect(result.state === 'checked' && result.flutterRevisionMatches).toBe(true);
@@ -88,14 +115,20 @@ describe('runGuardCheck', () => {
 
   it('reports no-xcode when the active Xcode cannot be read', () => {
     const { logger } = capturedLogger();
-    const result = runGuardCheck(inputs({ active: { ok: false, reason: { kind: 'no-xcode' } } }), logger);
+    const result = runGuardCheck(
+      inputs({ active: { ok: false, reason: { kind: 'no-xcode' } } }),
+      logger,
+    );
     expect(result).toEqual({ state: 'no-xcode', reason: { kind: 'no-xcode' } });
   });
 
   it('reports cli-unavailable when shorebird is missing but still carries the active Xcode', () => {
     const { logger } = capturedLogger();
     const result = runGuardCheck(
-      inputs({ version: { ok: false, reason: { kind: 'cli-missing', command: 'shorebird' } }, releases: { ok: false, reason: { kind: 'cli-missing', command: 'shorebird' } } }),
+      inputs({
+        version: { ok: false, reason: { kind: 'cli-missing', command: 'shorebird' } },
+        releases: { ok: false, reason: { kind: 'cli-missing', command: 'shorebird' } },
+      }),
       logger,
     );
     expect(result.state).toBe('cli-unavailable');
@@ -117,13 +150,19 @@ describe('runGuardCheck', () => {
 
   it('reports no-releases when neither server nor ledger know any', () => {
     const { logger } = capturedLogger();
-    const result = runGuardCheck(inputs({ releases: { ok: true, value: [] }, ledger: { ok: true, value: ledgerWith({}) } }), logger);
+    const result = runGuardCheck(
+      inputs({ releases: { ok: true, value: [] }, ledger: { ok: true, value: ledgerWith({}) } }),
+      logger,
+    );
     expect(result.state).toBe('no-releases');
   });
 
   it('reports ledger-error when the ledger is corrupt', () => {
     const { logger } = capturedLogger();
-    const result = runGuardCheck(inputs({ ledger: { ok: false, reason: { kind: 'corrupt', path: '/l' } } }), logger);
+    const result = runGuardCheck(
+      inputs({ ledger: { ok: false, reason: { kind: 'corrupt', path: '/l' } } }),
+      logger,
+    );
     expect(result).toEqual({ state: 'ledger-error', reason: { kind: 'corrupt', path: '/l' } });
   });
 
