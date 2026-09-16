@@ -18,12 +18,10 @@ describe('exec', () => {
       args: ['-e', 'process.stderr.write("bad"); process.exit(3)'],
       timeoutMs: 5000,
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.reason.kind).toBe('exit');
-      expect(result.reason.stderr).toBe('bad');
-      expect(result.reason.exitCode).toBe(3);
-    }
+    expect(result).toEqual({
+      ok: false,
+      reason: { kind: 'exit', exitCode: 3, stdout: '', stderr: 'bad' },
+    });
   });
 
   it('reports a missing binary as not-found', async () => {
