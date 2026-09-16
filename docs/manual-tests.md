@@ -9,7 +9,7 @@ Setup per row: open a real Shorebird app folder, make the named Xcode active wit
 - [ ] Aligned — ledger entry for the latest release records Xcode A. Status bar `$(shield) Xcode A`, default colour. **Patch iOS (guarded)** spawns the terminal without a modal.
 - [ ] Minor drift — ledger entry records Xcode A with a different minor (edit `xcodeVersion`/`xcodeBuild`). Status bar `≠`, error background. **Patch iOS (guarded)** shows the modal with **Switch to Xcode …**, **Build anyway**, **Details**.
 - [ ] Major drift — ledger entry records a different major. Modal has no **Build anyway** button.
-- [ ] No ledger entry — delete `.shorebird-guard/ledger.json`. Status bar `?`. **Patch IOS (guarded)** warns once and still launches; second run in the same session does not warn again.
+- [ ] No ledger entry — delete `.shorebird-guard/ledger.json`. Status bar `?`. **Patch iOS (guarded)** warns once and still launches; second run in the same session does not warn again.
 - [ ] No Shorebird CLI — set `shorebirdGuard.shorebirdPath` to `/nonexistent`. Status bar `?`, tooltip says CLI unavailable, no error notification on activation.
 
 ## Xcode B active
