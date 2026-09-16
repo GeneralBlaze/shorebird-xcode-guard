@@ -1,0 +1,26 @@
+Shorebird 1.6.116 • git@github.com:shorebirdtech/shorebird.git
+Flutter 3.44.9 • revision c2515c46c7fca511e39735a615f0f12f3dca6230
+Engine • revision a787a8fe98e99918255bb4bf4835f6ae010c1035
+
+Logs: /Users/dev/Library/Application Support/shorebird/logs
+Android Toolchain
+  • Android Studio: /Applications/Android Studio.app/Contents
+  • Android SDK: /Users/dev/Library/Android/sdk
+  • ADB: /Users/dev/Library/Android/sdk/platform-tools/adb
+  • JAVA_HOME: /Applications/Android Studio.app/Contents/jbr/Contents/Home
+  • JAVA_EXECUTABLE: /Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java
+  • JAVA_VERSION: openjdk version "21.0.5" 2024-10-15
+                  OpenJDK Runtime Environment (build 21.0.5+-12932927-b750.29)
+                  OpenJDK 64-Bit Server VM (build 21.0.5+-12932927-b750.29, mixed mode)
+                  
+  • Gradle: 8.14
+
+URL Reachability
+
+Network Speed
+
+  [!] A new version of shorebird is available! Run `shorebird upgrade` to upgrade.
+1 issue detected.
+
+A new version of shorebird is available!
+Run shorebird upgrade to upgrade.

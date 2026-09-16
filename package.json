@@ -1,0 +1,210 @@
+{
+  "name": "shorebird-xcode-guard",
+  "displayName": "Shorebird Xcode Guard",
+  "description": "Blocks shorebird patch ios when the active Xcode differs from the one that built the release.",
+  "version": "1.0.0",
+  "publisher": "nexcyph",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GeneralBlaze/shorebird-xcode-guard"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "Linters"
+  ],
+  "keywords": [
+    "shorebird",
+    "flutter",
+    "xcode",
+    "ios",
+    "code push"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/shorebird.yaml"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Runs the Shorebird CLI and xcode-select from the workspace."
+    }
+  },
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "shorebirdGuard.checkNow",
+        "title": "Check toolchain alignment",
+        "category": "Shorebird Guard"
+      },
+      {
+        "command": "shorebirdGuard.patchIos",
+        "title": "Patch iOS (guarded)",
+        "category": "Shorebird Guard"
+      },
+      {
+        "command": "shorebirdGuard.recordRelease",
+        "title": "Record current toolchain for release…",
+        "category": "Shorebird Guard"
+      },
+      {
+        "command": "shorebirdGuard.switchXcode",
+        "title": "Switch active Xcode…",
+        "category": "Shorebird Guard"
+      },
+      {
+        "command": "shorebirdGuard.showLedger",
+        "title": "Open toolchain ledger",
+        "category": "Shorebird Guard"
+      },
+      {
+        "command": "shorebirdGuard.showLogs",
+        "title": "Show logs",
+        "category": "Shorebird Guard"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "shorebirdGuard.checkNow",
+          "when": "shorebirdGuard:isShorebirdWorkspace"
+        },
+        {
+          "command": "shorebirdGuard.patchIos",
+          "when": "shorebirdGuard:isShorebirdWorkspace"
+        },
+        {
+          "command": "shorebirdGuard.recordRelease",
+          "when": "shorebirdGuard:isShorebirdWorkspace"
+        },
+        {
+          "command": "shorebirdGuard.switchXcode",
+          "when": "shorebirdGuard:isShorebirdWorkspace"
+        },
+        {
+          "command": "shorebirdGuard.showLedger",
+          "when": "shorebirdGuard:isShorebirdWorkspace"
+        },
+        {
+          "command": "shorebirdGuard.showLogs",
+          "when": "shorebirdGuard:isShorebirdWorkspace"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Shorebird Guard",
+      "properties": {
+        "shorebirdGuard.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Enable the toolchain guard."
+        },
+        "shorebirdGuard.blockOn": {
+          "type": "string",
+          "enum": [
+            "never",
+            "major-drift",
+            "minor-drift",
+            "patch-drift"
+          ],
+          "default": "minor-drift",
+          "scope": "resource",
+          "description": "Lowest drift severity that blocks a patch build."
+        },
+        "shorebirdGuard.warnOn": {
+          "type": "string",
+          "enum": [
+            "never",
+            "major-drift",
+            "minor-drift",
+            "patch-drift"
+          ],
+          "default": "patch-drift",
+          "scope": "resource",
+          "description": "Lowest drift severity that shows a warning."
+        },
+        "shorebirdGuard.autoRecordReleases": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Reserved for observed auto-recording (v1.1)."
+        },
+        "shorebirdGuard.ledgerPath": {
+          "type": "string",
+          "default": ".shorebird-guard/ledger.json",
+          "scope": "resource",
+          "description": "Ledger file path relative to the app folder."
+        },
+        "shorebirdGuard.shorebirdPath": {
+          "type": "string",
+          "default": "shorebird",
+          "scope": "resource",
+          "description": "Path to the shorebird executable."
+        },
+        "shorebirdGuard.checkFlutterRevision": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Also compare the Flutter revision against the release."
+        },
+        "shorebirdGuard.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Show the status bar item."
+        },
+        "shorebirdGuard.cliTimeoutMs": {
+          "type": "number",
+          "default": 15000,
+          "scope": "resource",
+          "description": "Timeout for CLI calls in milliseconds."
+        },
+        "shorebirdGuard.trace": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "scope": "resource",
+          "description": "Log verbosity."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "vscode:prepublish": "npm run build -- --production",
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:unit": "vitest run --coverage",
+    "pretest:integration": "npm run build && tsc -p test/integration/tsconfig.json",
+    "test:integration": "node out/test/integration/runTests.js",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.20.3",
+    "@types/vscode": "^1.90.0",
+    "@vitest/coverage-v8": "^5.0.1",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.10.0",
+    "glob": "^13.0.6",
+    "mocha": "^12.0.1",
+    "prettier": "^3.9.7",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.1"
+  }
+}

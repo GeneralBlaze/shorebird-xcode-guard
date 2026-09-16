@@ -1,0 +1,6 @@
+Shorebird 1.6.116 • git@github.com:shorebirdtech/shorebird.git
+Flutter 3.44.9 • revision c2515c46c7fca511e39735a615f0f12f3dca6230
+Engine • revision a787a8fe98e99918255bb4bf4835f6ae010c1035
+
+A new version of shorebird is available!
+Run shorebird upgrade to upgrade.

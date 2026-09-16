@@ -1,0 +1,3 @@
+[unverified — requires a real drift build]
+Placeholder for the stderr produced by `shorebird patch ios` when the active Xcode differs from the one that built the target release.
+Capturing this fixture requires cutting a release on one Xcode and patching on another, which this project has not done.

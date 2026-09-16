@@ -1,0 +1,1 @@
+{"status":"success","data":{"shorebird_version":"1.6.116","flutter_version":"3.44.9","flutter_revision":"c2515c46c7fca511e39735a615f0f12f3dca6230","engine_revision":"a787a8fe98e99918255bb4bf4835f6ae010c1035"},"meta":{"version":"1.6.116","command":"version"}}
