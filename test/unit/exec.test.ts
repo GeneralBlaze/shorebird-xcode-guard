@@ -7,8 +7,15 @@ const node = process.execPath;
 describe('exec', () => {
   it('captures stdout and exit code on success', async () => {
     const exec = createExec();
-    const result = await exec({ command: node, args: ['-e', 'process.stdout.write("hi")'], timeoutMs: 5000 });
-    expect(result).toEqual<ExecResult>({ ok: true, value: { stdout: 'hi', stderr: '', exitCode: 0 } });
+    const result = await exec({
+      command: node,
+      args: ['-e', 'process.stdout.write("hi")'],
+      timeoutMs: 5000,
+    });
+    expect(result).toEqual<ExecResult>({
+      ok: true,
+      value: { stdout: 'hi', stderr: '', exitCode: 0 },
+    });
   });
 
   it('reports non-zero exit as a failure carrying stderr', async () => {
@@ -26,7 +33,11 @@ describe('exec', () => {
 
   it('reports a missing binary as not-found', async () => {
     const exec = createExec();
-    const result = await exec({ command: '/nonexistent/definitely-missing', args: [], timeoutMs: 5000 });
+    const result = await exec({
+      command: '/nonexistent/definitely-missing',
+      args: [],
+      timeoutMs: 5000,
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason.kind).toBe('not-found');
@@ -36,7 +47,11 @@ describe('exec', () => {
   it('times out and kills the child', async () => {
     const exec = createExec();
     const started = Date.now();
-    const result = await exec({ command: node, args: ['-e', 'setTimeout(()=>{}, 10000)'], timeoutMs: 200 });
+    const result = await exec({
+      command: node,
+      args: ['-e', 'setTimeout(()=>{}, 10000)'],
+      timeoutMs: 200,
+    });
     expect(Date.now() - started).toBeLessThan(5000);
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -65,7 +80,12 @@ describe('exec', () => {
     const exec = createExec();
     const source = createCancellationSource();
     source.cancel();
-    const result = await exec({ command: node, args: ['-e', ''], timeoutMs: 1000, token: source.token });
+    const result = await exec({
+      command: node,
+      args: ['-e', ''],
+      timeoutMs: 1000,
+      token: source.token,
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason.kind).toBe('cancelled');

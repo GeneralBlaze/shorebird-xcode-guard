@@ -20,7 +20,12 @@ export type ExecFailure =
   | { readonly kind: 'not-found'; readonly command: string }
   | { readonly kind: 'timeout'; readonly timeoutMs: number }
   | { readonly kind: 'cancelled' }
-  | { readonly kind: 'exit'; readonly exitCode: number; readonly stdout: string; readonly stderr: string }
+  | {
+      readonly kind: 'exit';
+      readonly exitCode: number;
+      readonly stdout: string;
+      readonly stderr: string;
+    }
   | { readonly kind: 'spawn-error'; readonly message: string };
 
 export type ExecResult = Result<ExecOutput, ExecFailure>;
@@ -34,7 +39,12 @@ interface NodeExecError extends Error {
   readonly signal?: string;
 }
 
-function classify(error: NodeExecError, request: ExecRequest, stdout: string, stderr: string): ExecFailure {
+function classify(
+  error: NodeExecError,
+  request: ExecRequest,
+  stdout: string,
+  stderr: string,
+): ExecFailure {
   if (request.token?.isCancellationRequested === true) {
     return { kind: 'cancelled' };
   }
@@ -60,7 +70,12 @@ export function createExec(): Exec {
       const child = execFile(
         request.command,
         [...request.args],
-        { cwd: request.cwd, timeout: request.timeoutMs, maxBuffer: MAX_BUFFER_BYTES, encoding: 'utf8' },
+        {
+          cwd: request.cwd,
+          timeout: request.timeoutMs,
+          maxBuffer: MAX_BUFFER_BYTES,
+          encoding: 'utf8',
+        },
         (error, stdout, stderr) => {
           subscription?.dispose();
           if (error === null) {

@@ -8,7 +8,13 @@ const collect = (): { readonly lines: string[]; readonly sink: LogSink } => {
   };
   return {
     lines,
-    sink: { trace: push('trace'), debug: push('debug'), info: push('info'), warn: push('warn'), error: push('error') },
+    sink: {
+      trace: push('trace'),
+      debug: push('debug'),
+      info: push('info'),
+      warn: push('warn'),
+      error: push('error'),
+    },
   };
 };
 
